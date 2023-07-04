@@ -32,8 +32,12 @@ rgw_handoff_uri         = http://127.0.0.1:8001/
 
 ## Test
 
+I use the dbstore backend for Ceph, which automatically installs a user with a
+set keypair, mapping to uid 'testid'. I test with `s3cmd`.
+
 If you don't have s3cmd configured already, this will do it for a server on
-`localhost:3000` and using the Ceph default keypair.
+`localhost:3000` and using the Ceph default keypair. Clearly, this will
+overwrite any existing `~/.s3cfg`.
 
 ```sh
 s3cmd --access_key='0555b35654ad1656d804' \
@@ -53,7 +57,12 @@ the same uid. This is deliberate.
 | `testid`| `0555b35654ad1656d804` | `h7GhxuBLTrlhVUyxSPUKUV8r/2EI4ngqJxD7iBdBYLhwluN30JaT3Q==`|
 | `testid` | `4d41474943574f524453` | `53515545414d4953484f5353494652414745`|
 
-If you want different keys and user IDs, edit variable `keys` in the source file.
+If you want different keys and user IDs, edit variable `keys` in the source
+file.
+
+Now any s3 command that works with rgw should work here. Note you can swap in
+the alternative access/secret keys and everything works as before, because it
+all maps back to the same uid.
 
 ```sh
 s3cmd mb s3://test
