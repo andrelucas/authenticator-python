@@ -79,8 +79,6 @@ def aws_sig_v4(post):
 
     This will throw a SignatureException on any singature calculation or
     verification error.
-
-    XXX exceptions should include a specific HTTP response code like reality.
     """
 
     # Everything gets encoded into byte arrays. This is a pain and looks ugly,
