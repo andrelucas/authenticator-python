@@ -85,7 +85,6 @@ def aws_sig_v4(post):
     # but keeps Python happy.
 
     # Split the Authorization header into useful chunks.
-    # AWS4-HMAC-SHA256 Credential=ACCESSKEY/20230704/us-east-1/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=SIG
     auth = post["authorization"]
 
     m = re_sig.search(auth)
