@@ -109,7 +109,8 @@ def aws_sig_v4(post):
     uid = lookup["uid"]
     access_key = access_key.encode("UTF-8")
 
-    # Cross check the and headers.
+    # Cross check the access key field with the Credential in the
+    # Authorization header.
     if hdr_access_key != access_key:
         raise SignatureException(400, "ACCESS_KEY_MISMATCH")
 
