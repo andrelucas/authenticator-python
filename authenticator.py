@@ -47,8 +47,8 @@ re_sig_v4 = re.compile(
         /(?P<region>[0-9a-z-]+)
         /(?P<service>[0-9a-z-]+)
         /aws4_request
-        ,SignedHeaders=(?P<signhdr>[a-z0-9-;]+)
-        ,Signature=(?P<sig>[0-9a-f]+)
+        ,\s*SignedHeaders=(?P<signhdr>[a-z0-9-;]+)
+        ,\s*Signature=(?P<sig>[0-9a-f]+)
         $""",
     re.VERBOSE | re.IGNORECASE,
 )
