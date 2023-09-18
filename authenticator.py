@@ -25,6 +25,10 @@ keys = {
         "secret": b"SQUEAMISHOSSIFRAGE".hex(),
         "uid": "testid",
     },
+    "deadbeef": {
+        "secret": "0ddc0ffeebadf00d",
+        "uid": "testid2",
+    },
 }
 
 
