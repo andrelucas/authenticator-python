@@ -242,11 +242,16 @@ def run(port=8002):
     server_address = f"127.0.0.1:{port}"
     logging.info("Starting gRPC service...\n")
     try:
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server = grpc.server(
+            futures.ThreadPoolExecutor(max_workers=10),
+            options=(
+                ("grpc.so_reuseport", 0),
+            ),  # This apparently helps detect port reuse - see https://github.com/grpc/grpc/issues/16920
+        )
         auth_pb2_grpc.add_AuthServiceServicer_to_server(AuthServer(), server)
         server.add_insecure_port(server_address)
         server.start()
-        print(f"Server started, listening on {server_address}")
+        logging.info(f"Server started, listening on {server_address}")
         server.wait_for_termination()
     except KeyboardInterrupt:
         pass
@@ -258,9 +263,9 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(description="Auth gRPC server")
     p.add_argument("port", type=int, help="Listen port", nargs="?", default=8002)
-    p.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    p.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
 
-    args = p.parse_args(argv[1:])
+    args = p.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
