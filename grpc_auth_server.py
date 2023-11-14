@@ -77,6 +77,8 @@ class SignatureException(Exception):
 
 def aws_sig(req: auth_pb2.AuthRequest):
     logging.debug(f"authorization_header: {req.authorization_header}")
+    if req.authorization_token_header != "":
+        logging.debug(f"authorization_token_header: {req.authorization_token_header}")
     logging.debug(f"access_key_id: {req.access_key_id}")
     logging.debug(f"string_to_sign: {req.string_to_sign}")
 
