@@ -71,7 +71,7 @@ path. (It has to match the protobuf source's expected path.)
 
 The server can be stopped with CTRL-C.
 
-## Testing the gRPC in standalone mode
+## Testing the gRPC server in standalone mode
 
 There's a standalone gRPC client that's useful for checking the server without
 too much machinery.

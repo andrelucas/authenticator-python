@@ -4,6 +4,7 @@ Simple test client for the AuthService gRPC protocol.
 """
 
 import argparse
+import base64
 import grpc
 import logging
 import sys
@@ -20,7 +21,7 @@ def status(stub: auth_pb2_grpc.AuthServiceStub, args):
 
 def auth(stub: auth_pb2_grpc.AuthServiceStub, args):
     req = auth_pb2.AuthRequest()
-    req.string_to_sign = args.string_to_sign
+    req.string_to_sign = base64.b64decode(args.string_to_sign_base64).decode()
     req.authorization_header = args.authorization_header
     req.access_key_id = args.access_key_id
     response = stub.Auth(req)
@@ -34,7 +35,7 @@ def main(argv):
     p.add_argument("command")
     p.add_argument("-p", "--port", type=int, default=8002, help="server listen port")
     p.add_argument("-v", "--verbose", action="store_true")
-    p.add_argument("--string-to-sign", help="stringToSign field")
+    p.add_argument("--string-to-sign-base64", help="stringToSign field")
     p.add_argument("--authorization-header", help="Authorization: header contents")
     p.add_argument("--access-key-id", help="AWS_ACCESS_KEY_ID value")
 
