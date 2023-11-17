@@ -75,12 +75,32 @@ class SignatureException(Exception):
         return "{} {}".format(self.code, self.message)
 
 
+def reqmethod_to_str(method: auth_pb2.RequestMethod):
+    if method == auth_pb2.RequestMethod.REQUEST_METHOD_GET:
+        return "GET"
+    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_PUT:
+        return "PUT"
+    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_DELETE:
+        return "DELETE"
+    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_POST:
+        return "POST"
+    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_HEAD:
+        return "HEAD"
+    else:
+        return "UNKNOWN"
+
+
 def aws_sig(req: auth_pb2.AuthRequest):
+    logging.info("new request")
     logging.debug(f"authorization_header: {req.authorization_header}")
     if req.authorization_token_header != "":
         logging.debug(f"authorization_token_header: {req.authorization_token_header}")
     logging.debug(f"access_key_id: {req.access_key_id}")
     logging.debug(f"string_to_sign: {req.string_to_sign}")
+    if req.HasField("param"):
+        logging.debug(
+            f"param: method={reqmethod_to_str(req.param.method)}, bucket_name={req.param.bucket_name}, object_key_name={req.param.object_key_name}"
+        )
 
     auth = req.authorization_header
     if auth.startswith("AWS "):
