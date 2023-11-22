@@ -101,6 +101,9 @@ def aws_sig(req: auth_pb2.AuthRequest):
         logging.debug(
             f"param: method={reqmethod_to_str(req.param.method)}, bucket_name={req.param.bucket_name}, object_key_name={req.param.object_key_name}"
         )
+        if req.param.http_headers:
+            for k, v in req.param.http_headers.items():
+                logging.debug(f"param.http_headers: {k}={v}")
 
     auth = req.authorization_header
     if auth.startswith("AWS "):
