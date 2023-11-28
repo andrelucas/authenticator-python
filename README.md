@@ -2,6 +2,9 @@
 
 Simple Python prototype of The Authenticator.
 
+This service comes in two flavours. The OG authenticator uses REST over HTTP,
+but the version we'll be developing in the future uses gRPC.
+
 # HTTP server
 
 ## Starting the server
@@ -19,7 +22,7 @@ The server can be stopped with CTRL-C.
 ## Configure RGW
 
 Obviously you'll need an RGW with the Handoff authenticator patched in and
-enabled.
+enabled. This configuration disables gRPC mode, which is required to test HTTP mode.
 
 ```ini
 ...
@@ -37,20 +40,21 @@ rgw_handoff_uri         = http://127.0.0.1:8001/
 
 # gRPC server
 
-The gRPC-based server is forked from the HTTP server as of 20231113, and was
-created to test the gRPC integration recently added to RGW.
+The gRPC-based server is forked from the HTTP server as of 20231113. gRPC and
+HTTP are both being maintained in the short term, but HTTP will be deprecated
+in early 2024.
 
 ## Prereqs
 
 ```sh
-pip3 install grpc
+pip3 install grpcio grpcio-tools
 ```
 
 ## Grab gRPC and protobuf generated code.
 
 From a C++ build dir (not the source dir - these are generated files), grab
-`bufgen/rgw/auth/v1/auth_pb2{,_grpc}.py` and copy to `rgw/auth/v1/` in this
-source tree.
+`bufgen/rgw/auth/v1/auth_pb2{,_grpc}.py` and copy to `rgw/auth/v1/` into the
+authenticator-python source tree.
 
 ```sh
 cp MYBUILDDIR/rgw/auth/v1/auth_pb2*.py rgw/auth/v1/
@@ -67,9 +71,24 @@ path. (It has to match the protobuf source's expected path.)
 
 # Start on a different port.
 ./grpc_auth_server.py 8002
+
+# Start in verbose mode (useful!)
+./grpc_auth_server.py --verbose
 ```
 
 The server can be stopped with CTRL-C.
+
+If you get this:
+
+```sh
+$ ./grpc_auth_server.py
+Traceback (most recent call last):
+  File "./grpc_auth_server.py", line 18, in <module>
+    from rgw.auth.v1 import auth_pb2_grpc
+ImportError: cannot import name 'auth_pb2_grpc' from 'rgw.auth.v1' (unknown location)
+```
+
+then you've not installed the gRPC generated source as directed above. Pay attention!
 
 ## Testing the gRPC server in standalone mode
 
@@ -102,8 +121,9 @@ INFO:root:server responses: uid='testid' message='OK' code='200'
 
 ## Configure RGW
 
-Obviously you'll need an RGW with the Handoff authenticator patched in and
-enabled.
+You'll need an RGW with the Handoff authenticator patched in and
+enabled. This configuration applies to a regular cluster, but can be applied
+to a vstart.sh cluster by using the '-o' option to vstart.sh.
 
 ```ini
 ...
@@ -116,6 +136,17 @@ rgw_handoff_grpc_uri = dns:127.0.0.1:8002
 ...
 ```
 
+A vstart equivalent might be:
+
+```sh
+$ cd git/ceph/build  # Assuming that's where you've build it.
+
+$ ../src/stop.sh;
+env CEPH_PORT=40000 FS=0 RGW=1 MON=1 MDS=0 OSD=1 \
+    ../src/vstart.sh -d -n -x \
+    -o "rgw_s3_auth_use_handoff = true" -o "rgw_s3_auth_order = external" \
+    -o "rgw_beast_enable_async = false" -o "rgw_dns_name = $(hostname -f)"
+```
 
 # Test
 
@@ -124,7 +155,8 @@ set keypair, mapping to uid 'testid'. I test with `s3cmd`.
 
 If you don't have s3cmd configured already, this will do it for a server on
 `localhost:3000` and using the Ceph default keypair. Clearly, this will
-overwrite any existing `~/.s3cfg`.
+overwrite any existing `~/.s3cfg`. Note that this setting doesn't support
+virtual hosting, which will break some commands:
 
 ```sh
 s3cmd --access_key='0555b35654ad1656d804' \
