@@ -99,11 +99,17 @@ def aws_sig(req: auth_pb2.AuthRequest):
     logging.debug(f"string_to_sign: {req.string_to_sign}")
     if req.HasField("param"):
         logging.debug(
-            f"param: method={reqmethod_to_str(req.param.method)}, bucket_name={req.param.bucket_name}, object_key_name={req.param.object_key_name}"
+            f"param: method={reqmethod_to_str(req.param.method)}, "
+            + f"bucket_name={req.param.bucket_name}, "
+            + f"object_key_name={req.param.object_key_name}, "
+            + f"request_path={req.param.http_request_path}"
         )
         if req.param.http_headers:
             for k, v in req.param.http_headers.items():
                 logging.debug(f"param.http_headers: {k}={v}")
+        if req.param.http_query_parameters:
+            for k, v in req.param.http_query_parameters.items():
+                logging.debug(f"param.query_params: {k}={v}")
 
     auth = req.authorization_header
     if auth.startswith("AWS "):
