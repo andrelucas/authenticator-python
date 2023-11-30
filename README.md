@@ -57,7 +57,7 @@ From a C++ build dir (not the source dir - these are generated files), grab
 authenticator-python source tree.
 
 ```sh
-cp MYBUILDDIR/rgw/auth/v1/auth_pb2*.py rgw/auth/v1/
+cp MYBUILDDIR/bufgen/rgw/auth/v1/auth_pb2*.py rgw/auth/v1/
 ```
 
 The path is so the Python code can be imported as a module, using the proper
