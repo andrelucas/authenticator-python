@@ -92,11 +92,20 @@ def reqmethod_to_str(method: auth_pb2.RequestMethod):
 
 def aws_sig(req: auth_pb2.AuthRequest):
     logging.info("new request")
-    logging.debug(f"authorization_header: {req.authorization_header}")
-    if req.authorization_token_header != "":
-        logging.debug(f"authorization_token_header: {req.authorization_token_header}")
-    logging.debug(f"access_key_id: {req.access_key_id}")
-    logging.debug(f"string_to_sign: {req.string_to_sign}")
+    anonymous: bool = False
+
+    if req.user_type == auth_pb2.AuthUserType.AUTH_USER_TYPE_ANONYMOUS:
+        logging.debug("anonymous request")
+        anonymous = True
+    else:
+        logging.debug(f"authorization_header: {req.authorization_header}")
+        if req.authorization_token_header != "":
+            logging.debug(
+                f"authorization_token_header: {req.authorization_token_header}"
+            )
+        logging.debug(f"access_key_id: {req.access_key_id}")
+        logging.debug(f"string_to_sign: {req.string_to_sign}")
+
     if req.HasField("param"):
         logging.debug(
             f"param: method={reqmethod_to_str(req.param.method)}, "
@@ -111,11 +120,14 @@ def aws_sig(req: auth_pb2.AuthRequest):
             for k, v in req.param.http_query_parameters.items():
                 logging.debug(f"param.query_params: {k}={v}")
 
-    auth = req.authorization_header
-    if auth.startswith("AWS "):
-        return aws_sig_v2(req)
+    if anonymous:
+        return "ANONYMOUS"
     else:
-        return aws_sig_v4(req)
+        auth = req.authorization_header
+        if auth.startswith("AWS "):
+            return aws_sig_v2(req)
+        else:
+            return aws_sig_v4(req)
 
 
 def aws_sig_v2(req: auth_pb2.AuthRequest):
@@ -257,11 +269,26 @@ class AuthServer(auth_pb2_grpc.AuthServiceServicer):
     def Auth(self, request, context):
         try:
             uid = aws_sig(request)
-            return auth_pb2.AuthResponse(uid=uid, message="OK", code=200)
+            if uid == "ANONYMOUS":
+                user_type = auth_pb2.AuthUserType.AUTH_USER_TYPE_ANONYMOUS
+            else:
+                user_type = auth_pb2.AuthUserType.AUTH_USER_TYPE_UNSPECIFIED
+
+            return auth_pb2.AuthResponse(
+                user_type=user_type,
+                uid=uid,
+                message="OK",
+                code=200,
+            )
 
         except SignatureException as e:
             logging.warning(f"Authentication failed: {e}")
-            return auth_pb2.AuthResponse(uid="", message=e.message, code=e.code)
+            return auth_pb2.AuthResponse(
+                user_type=auth_pb2.AuthUserType.AUTH_USER_TYPE_UNSPECIFIED,
+                uid="",
+                message=e.message,
+                code=e.code,
+            )
 
     def Status(self, request, context):
         return auth_pb2.StatusResponse(
