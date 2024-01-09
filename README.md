@@ -3,7 +3,7 @@
 Simple Python prototype of The Authenticator.
 
 This service comes in two flavours. The OG authenticator uses REST over HTTP,
-but the version we'll be developing in the future uses gRPC.
+but the gRPC version is the version to use for real work.
 
 # HTTP server
 
