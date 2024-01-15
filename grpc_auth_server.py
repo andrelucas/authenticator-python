@@ -15,8 +15,8 @@ import hmac
 import logging
 import re
 
-from rgw.auth.v1 import auth_pb2_grpc
-from rgw.auth.v1 import auth_pb2
+from authenticator.v1 import authenticator_pb2_grpc as auth_pb2_grpc
+from authenticator.v1 import authenticator_pb2 as auth_pb2
 
 # A fixed set of recognised keys, secrets and uids.
 # Feel the security.

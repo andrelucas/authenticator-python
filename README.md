@@ -53,11 +53,11 @@ pip3 install grpcio grpcio-tools
 ## Grab gRPC and protobuf generated code.
 
 From a C++ build dir (not the source dir - these are generated files), grab
-`bufgen/rgw/auth/v1/auth_pb2{,_grpc}.py` and copy to `rgw/auth/v1/` into the
-authenticator-python source tree.
+`bufgen/authenticator/v1/*.py` and copy to `authenticator/v1/` in
+the authenticator-python source tree.
 
 ```sh
-cp MYBUILDDIR/bufgen/rgw/auth/v1/auth_pb2*.py rgw/auth/v1/
+cp MYBUILDDIR/bufgen/authenticator/v1/*.py authenticator/v1
 ```
 
 The path is so the Python code can be imported as a module, using the proper
