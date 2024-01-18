@@ -47,7 +47,7 @@ in early 2024.
 ## Prereqs
 
 ```sh
-pip3 install grpcio grpcio-tools
+pip3 install grpcio grpcio-status grpcio-tools
 ```
 
 ## Grab gRPC and protobuf generated code.
@@ -84,8 +84,8 @@ If you get this:
 $ ./grpc_auth_server.py
 Traceback (most recent call last):
   File "./grpc_auth_server.py", line 18, in <module>
-    from rgw.auth.v1 import auth_pb2_grpc
-ImportError: cannot import name 'auth_pb2_grpc' from 'rgw.auth.v1' (unknown location)
+    from authenticator.v1 import auth_pb2_grpc
+ImportError: cannot import name 'auth_pb2_grpc' from 'authenticator.v1' (unknown location)
 ```
 
 then you've not installed the gRPC generated source as directed above. Pay attention!
@@ -106,15 +106,24 @@ DEBUG:root:using server_address dns:127.0.0.1:8002
 INFO:root:server responses: uid='' message='V4_AUTHORIZATION_HEADER_MALFORMED' code='400'
 ```
 
-Here's an authorization that should work (yes, I know it's a lot):
+Here's a v4 authentication that should work (yes, I know it's a lot):
 
 ```sh
 $ ./grpc_auth_client.py -v auth \
 --string-to-sign="QVdTNC1ITUFDLVNIQTI1NgoyMDIzMTExM1QxNTA4MzNaCjIwMjMxMTEzL3VzLWVhc3QtMS9zMy9hd3M0X3JlcXVlc3QKOTFmM2ZlYmQ1NjFhMTgyNDU1M2RmNTQxMzJiMDVhNGFjZDk2ZDRlOTI4OWE0M2EzMWM5YmY5NWM5M2Q3OTY5Ng==" \
---authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace" \
---access-key-id="0555b35654ad1656d804"
+--authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace"
 DEBUG:root:using server_address dns:127.0.0.1:8002
-INFO:root:server responses: uid='testid' message='OK' code='200'
+INFO:root:server responses: uid='testid'
+```
+
+And here's a v2 authentication that should work:
+
+```sh
+$ ./grpc_auth_client.py -v auth \
+--string-to-sign="R0VUCgoKCngtYW16LWRhdGU6VHVlLCAxMSBKdWwgMjAyMyAxNzoxMDozOCArMDAwMAovdGVzdC8=" \
+--authorization-header="AWS 0555b35654ad1656d804:ZbQ5cA54KqNak3O2KTRTwX5YzUE="
+DEBUG:root:using server_address dns:127.0.0.1:8002
+INFO:root:server responses: uid='testid'
 ```
 
 # General testing
@@ -127,11 +136,11 @@ to a vstart.sh cluster by using the '-o' option to vstart.sh.
 
 ```ini
 ...
-# Enable the Handoff engine.
+# Enable the Handoff engine (false by default).
 rgw_s3_auth_use_handoff = true
-# Enable gRPC mode.
+# Enable gRPC mode (true by default).
 rgw_handoff_enable_grpc = true
-# Set a URI.
+# Set a URI. (The value shown is the default.)
 rgw_handoff_grpc_uri = dns:127.0.0.1:8002
 ...
 ```

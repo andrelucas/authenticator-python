@@ -9,7 +9,12 @@ Usage::
 import argparse
 import base64
 from concurrent import futures
+from google.protobuf import any_pb2
+from google.rpc import code_pb2
+from google.rpc import error_details_pb2
+from google.rpc import status_pb2
 import grpc
+from grpc_status import rpc_status
 from hashlib import sha256, sha1
 import hmac
 import logging
@@ -62,75 +67,76 @@ re_sig_v4 = re.compile(
 )
 
 
+def type_enum():
+    "Shortcut to get the enum type."
+    return auth_pb2.S3ErrorDetails.Type
+
+
 class SignatureException(Exception):
-    code = 401
+    grpc_code = code_pb2.INTERNAL
+    s3_error_type = 0  # TYPE_UNSPECIFIED.
+    http_error_code = 401  # Unauthorized (and requires authentication).
     message = ""
 
-    def __init__(self, code, message):
+    def __init__(self, grpc_code, s3_error_type, http_error_code, message):
         super().__init__()
-        self.code = code
+        self.grpc_code = grpc_code
+        self.s3_error_type = s3_error_type
+        self.http_error_code = http_error_code
         self.message = message
 
     def __str__(self):
-        return "{} {}".format(self.code, self.message)
+        gcstr = code_pb2.Code.Name(self.grpc_code)  # String form of the gRPC code.
+        tstr = (
+            type_enum().DESCRIPTOR.values_by_number[self.s3_error_type].name
+        )  # String form of the S3 error type.
+        return f"SignatureException(grpc_code={gcstr},s3_error_type={tstr},http_error_code={self.http_error_code},message='{self.message}')"
 
 
-def reqmethod_to_str(method: auth_pb2.RequestMethod):
-    if method == auth_pb2.RequestMethod.REQUEST_METHOD_GET:
+def reqmethod_to_str(method: auth_pb2.AuthenticateRESTRequest.HTTPMethod):
+    m = auth_pb2.AuthenticateRESTRequest.HTTPMethod
+
+    if method == m.REQUEST_METHOD_GET:
         return "GET"
-    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_PUT:
-        return "PUT"
-    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_DELETE:
-        return "DELETE"
-    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_POST:
-        return "POST"
-    elif method == auth_pb2.RequestMethod.REQUEST_METHOD_HEAD:
+    elif method == m.REQUEST_METHOD_HEAD:
         return "HEAD"
+    elif method == m.REQUEST_METHOD_POST:
+        return "POST"
+    elif method == m.REQUEST_METHOD_PUT:
+        return "PUT"
+    elif method == m.REQUEST_METHOD_DELETE:
+        return "DELETE"
     else:
         return "UNKNOWN"
 
 
-def aws_sig(req: auth_pb2.AuthRequest):
+def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
     logging.info("new request")
     anonymous: bool = False
 
-    if req.user_type == auth_pb2.AuthUserType.AUTH_USER_TYPE_ANONYMOUS:
-        logging.debug("anonymous request")
-        anonymous = True
+    logging.debug(f"authorization_header: {req.authorization_header}")
+    logging.debug(f"string_to_sign: {req.string_to_sign}")
+
+    for k, v in req.x_amz_headers.items():
+        logging.debug(f"x_amz_headers: {k}={v}")
+
+    for k, v in req.query_parameters.items():
+        logging.debug(f"query_parameters: {k}={v}")
+
+    if req.HasField("bucket_name"):
+        logging.debug(f"bucket_name: {req.bucket_name}")
+
+    if req.HasField("object_key"):
+        logging.debug(f"object_key: {req.object_key}")
+
+    auth = req.authorization_header
+    if auth.startswith("AWS "):
+        return aws_sig_v2(req)
     else:
-        logging.debug(f"authorization_header: {req.authorization_header}")
-        if req.authorization_token_header != "":
-            logging.debug(
-                f"authorization_token_header: {req.authorization_token_header}"
-            )
-        logging.debug(f"access_key_id: {req.access_key_id}")
-        logging.debug(f"string_to_sign: {req.string_to_sign}")
-
-    if req.HasField("param"):
-        logging.debug(
-            f"param: method={reqmethod_to_str(req.param.method)}, "
-            + f"bucket_name={req.param.bucket_name}, "
-            + f"object_key_name={req.param.object_key_name}, "
-            + f"request_path={req.param.http_request_path}"
-        )
-        if req.param.http_headers:
-            for k, v in req.param.http_headers.items():
-                logging.debug(f"param.http_headers: {k}={v}")
-        if req.param.http_query_parameters:
-            for k, v in req.param.http_query_parameters.items():
-                logging.debug(f"param.query_params: {k}={v}")
-
-    if anonymous:
-        return "ANONYMOUS"
-    else:
-        auth = req.authorization_header
-        if auth.startswith("AWS "):
-            return aws_sig_v2(req)
-        else:
-            return aws_sig_v4(req)
+        return aws_sig_v4(req)
 
 
-def aws_sig_v2(req: auth_pb2.AuthRequest):
+def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
     """
     Calculate an AWS S3 v2 signature, given the POST object sent by the
     Handoff engine.
@@ -143,24 +149,28 @@ def aws_sig_v2(req: auth_pb2.AuthRequest):
 
     m = re_sig_v2.search(auth)
     if not m:
-        raise SignatureException(400, "V2_AUTHORIZATION_HEADER_MALFORMED")
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_AUTHORIZATION_HEADER_MALFORMED,
+            400,
+            "V2_AUTHORIZATION_HEADER_MALFORMED",
+        )
 
-    hdr_access_key = m.group("accesskey").encode("UTF-8")
+    hdr_access_key = m.group("accesskey")
     hdrsig = m.group("sig")
 
     # Extract the secret key and userid from our super-secure dict.
-    access_key = req.access_key_id
-    if not access_key in keys:
-        raise SignatureException(401, "ACCESS_KEY_NOT_FOUND")
-    lookup = keys[access_key]
+    if not hdr_access_key in keys:
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_INVALID_ACCESS_KEY_ID,
+            401,
+            "ACCESS_KEY_NOT_FOUND",
+        )
+    lookup = keys[hdr_access_key]
     secret_key = lookup["secret"].encode("UTF-8")
     uid = lookup["uid"]
-    access_key = access_key.encode("UTF-8")
-
-    # Cross check the access key field with the Credential in the
-    # Authorization header.
-    if hdr_access_key != access_key:
-        raise SignatureException(400, "ACCESS_KEY_MISMATCH")
+    access_key = hdr_access_key.encode("UTF-8")
 
     ## Implement the signature scheme:
     ##   https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html
@@ -176,31 +186,30 @@ def aws_sig_v2(req: auth_pb2.AuthRequest):
         logging.info("SIGNATURE MATCH (uid={})".format(uid))
     else:
         logging.warning("SIGNATURE FAIL")
-        raise SignatureException(400, "SIGNATURE_NOT_VERIFIED")
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_SIGNATURE_DOES_NOT_MATCH,
+            401,
+            "SIGNATURE_NOT_VERIFIED",
+        )
 
     return uid
 
 
-def aws_sig_v4(req: auth_pb2.AuthRequest):
+def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
     """
     Calculate an AWS S3 v4 signature, given the POST object send by the
     Handoff engine.
 
-    Called with the JSON document passed to /verify:
-
-    {
-      "accessKeyId": ...,   // The access key.
-      "authorization": ..., // The Authorization header of the request.
-      "stringToSign": ...,  // The 'String to Sign' filled by RGW.
-    }
+    Called with an authenticator.v1.AuthenticateRESTRequest message.
 
     stringToSign is a formed by RGW as a canonicalisation of the original S3
     request. The formulation is tricky and I'm glad it's done for us.
 
-    authorization is the Authorization HTTP header.
+    authorization_header is the Authorization HTTP header.
 
-    accessKeyId is provided by RGW, and is (presumably) extracted from the
-    Authorization HTTP header.
+    Several fields are optional. Many requests don't have a bucket or object
+    key.
 
     This will throw a SignatureException on any singature calculation or
     verification error.
@@ -214,11 +223,18 @@ def aws_sig_v4(req: auth_pb2.AuthRequest):
 
     m = re_sig_v4.search(auth)
     if not m:
-        raise SignatureException(400, "V4_AUTHORIZATION_HEADER_MALFORMED")
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_AUTHORIZATION_HEADER_MALFORMED,
+            400,
+            "V4_AUTHORIZATION_HEADER_MALFORMED",
+        )
 
-    # This is used to crosscheck.
-    hdr_access_key = m.group("accesskey").encode("UTF-8")
-    # These are used go generate the Signing Key.
+    # We'll use the access key to look up the secret.
+    hdr_access_key = m.group("accesskey")
+    logging.debug(f"hdr_access_key: {hdr_access_key}")
+
+    # These are used to generate the Signing Key.
     hdr_shortdate = m.group("date").encode("UTF-8")
     hdr_region = m.group("region").encode("UTF-8")
     hdr_service = m.group("service").encode("UTF-8")
@@ -226,18 +242,17 @@ def aws_sig_v4(req: auth_pb2.AuthRequest):
     hdrsig = m.group("sig")
 
     # Extract the secret key and userid from our super-secure dict.
-    access_key = req.access_key_id
-    if not access_key in keys:
-        raise SignatureException(401, "ACCESS_KEY_NOT_FOUND")
-    lookup = keys[access_key]
+    if not hdr_access_key in keys:
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_INVALID_ACCESS_KEY_ID,
+            401,
+            "ACCESS_KEY_NOT_FOUND",
+        )
+    lookup = keys[hdr_access_key]
     secret_key = lookup["secret"].encode("UTF-8")
     uid = lookup["uid"]
-    access_key = access_key.encode("UTF-8")
-
-    # Cross check the access key field with the Credential in the
-    # Authorization header.
-    if hdr_access_key != access_key:
-        raise SignatureException(400, "ACCESS_KEY_MISMATCH")
+    access_key = hdr_access_key.encode("UTF-8")
 
     ## Implement the signature scheme:
     ##   https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
@@ -260,40 +275,52 @@ def aws_sig_v4(req: auth_pb2.AuthRequest):
         logging.info("SIGNATURE MATCH (uid={})".format(uid))
     else:
         logging.warning("SIGNATURE FAIL")
-        raise SignatureException(400, "SIGNATURE_NOT_VERIFIED")
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_SIGNATURE_DOES_NOT_MATCH,
+            401,
+            "SIGNATURE_NOT_VERIFIED",
+        )
 
     return uid
 
 
-class AuthServer(auth_pb2_grpc.AuthServiceServicer):
-    def Auth(self, request, context):
-        try:
-            uid = aws_sig(request)
-            if uid == "ANONYMOUS":
-                user_type = auth_pb2.AuthUserType.AUTH_USER_TYPE_ANONYMOUS
-            else:
-                user_type = auth_pb2.AuthUserType.AUTH_USER_TYPE_UNSPECIFIED
+def auth_error_status(e: SignatureException):
+    """
+    Create a gRPC status response embedding the given code and error message.
 
-            return auth_pb2.AuthResponse(
-                user_type=user_type,
-                uid=uid,
-                message="OK",
-                code=200,
+    This is fiddly: See https://grpc.io/docs/guides/error/ .
+    """
+
+    # The standard Status takes an Any field for message-specific error
+    # details. We'll use this to embed the S3 error type and HTTP status code.
+
+    detail = any_pb2.Any()
+    detail.Pack(
+        auth_pb2.S3ErrorDetails(
+            type=e.s3_error_type,
+            http_status_code=e.http_error_code,
+        )
+    )
+    return status_pb2.Status(
+        code=e.grpc_code,
+        message=e.message,
+        details=[detail],
+    )
+
+
+class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
+    def AuthenticateREST(self, request, context):
+        try:
+            # aws_sig will raise SignatureException on any error.
+            uid = aws_sig(request)
+            return auth_pb2.AuthenticateRESTResponse(
+                user_id=uid,
             )
 
         except SignatureException as e:
             logging.warning(f"Authentication failed: {e}")
-            return auth_pb2.AuthResponse(
-                user_type=auth_pb2.AuthUserType.AUTH_USER_TYPE_UNSPECIFIED,
-                uid="",
-                message=e.message,
-                code=e.code,
-            )
-
-    def Status(self, request, context):
-        return auth_pb2.StatusResponse(
-            server_description="grpc_authenticator.py v0.0.1"
-        )
+            context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
 
 
 def run(port=8002):
@@ -306,7 +333,7 @@ def run(port=8002):
                 ("grpc.so_reuseport", 0),
             ),  # This apparently helps detect port reuse - see https://github.com/grpc/grpc/issues/16920
         )
-        auth_pb2_grpc.add_AuthServiceServicer_to_server(AuthServer(), server)
+        auth_pb2_grpc.add_AuthenticatorServiceServicer_to_server(AuthServer(), server)
         server.add_insecure_port(server_address)
         server.start()
         logging.info(f"Server started, listening on {server_address}")
