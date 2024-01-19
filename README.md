@@ -109,9 +109,10 @@ INFO:root:server responses: uid='' message='V4_AUTHORIZATION_HEADER_MALFORMED' c
 Here's a v4 authentication that should work (yes, I know it's a lot):
 
 ```sh
-$ ./grpc_auth_client.py -v auth \
---string-to-sign="QVdTNC1ITUFDLVNIQTI1NgoyMDIzMTExM1QxNTA4MzNaCjIwMjMxMTEzL3VzLWVhc3QtMS9zMy9hd3M0X3JlcXVlc3QKOTFmM2ZlYmQ1NjFhMTgyNDU1M2RmNTQxMzJiMDVhNGFjZDk2ZDRlOTI4OWE0M2EzMWM5YmY5NWM5M2Q3OTY5Ng==" \
---authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace"
+./grpc_auth_client.py -v auth \
+  --string-to-sign="QVdTNC1ITUFDLVNIQTI1NgoyMDIzMTExM1QxNTA4MzNaCjIwMjMxMTEzL3VzLWVhc3QtMS9zMy9hd3M0X3JlcXVlc3QKOTFmM2ZlYmQ1NjFhMTgyNDU1M2RmNTQxMzJiMDVhNGFjZDk2ZDRlOTI4OWE0M2EzMWM5YmY5NWM5M2Q3OTY5Ng==" \
+  --authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace"
+
 DEBUG:root:using server_address dns:127.0.0.1:8002
 INFO:root:server responses: uid='testid'
 ```
@@ -119,9 +120,10 @@ INFO:root:server responses: uid='testid'
 And here's a v2 authentication that should work:
 
 ```sh
-$ ./grpc_auth_client.py -v auth \
---string-to-sign="R0VUCgoKCngtYW16LWRhdGU6VHVlLCAxMSBKdWwgMjAyMyAxNzoxMDozOCArMDAwMAovdGVzdC8=" \
---authorization-header="AWS 0555b35654ad1656d804:ZbQ5cA54KqNak3O2KTRTwX5YzUE="
+./grpc_auth_client.py -v auth \
+  --string-to-sign="R0VUCgoKCngtYW16LWRhdGU6VHVlLCAxMSBKdWwgMjAyMyAxNzoxMDozOCArMDAwMAovdGVzdC8=" \
+  --authorization-header="AWS 0555b35654ad1656d804:ZbQ5cA54KqNak3O2KTRTwX5YzUE="
+
 DEBUG:root:using server_address dns:127.0.0.1:8002
 INFO:root:server responses: uid='testid'
 ```
