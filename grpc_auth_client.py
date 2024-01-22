@@ -42,6 +42,8 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
     try:
         response = stub.AuthenticateREST(req)
         logging.info(f"server responses: uid='{response.user_id}'")
+        return True
+
     except grpc.RpcError as e:
         # Unpack the error.
         status = rpc_status.from_call(e)

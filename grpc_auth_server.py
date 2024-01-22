@@ -161,10 +161,11 @@ def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
 
     # Extract the secret key and userid from our super-secure dict.
     if not hdr_access_key in keys:
+        logging.warn("ACCESS_KEY_NOT_FOUND")
         raise SignatureException(
             code_pb2.INVALID_ARGUMENT,
             type_enum().TYPE_INVALID_ACCESS_KEY_ID,
-            401,
+            403,
             "ACCESS_KEY_NOT_FOUND",
         )
     lookup = keys[hdr_access_key]
@@ -189,7 +190,7 @@ def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
         raise SignatureException(
             code_pb2.INVALID_ARGUMENT,
             type_enum().TYPE_SIGNATURE_DOES_NOT_MATCH,
-            401,
+            403,
             "SIGNATURE_NOT_VERIFIED",
         )
 
@@ -243,6 +244,7 @@ def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
 
     # Extract the secret key and userid from our super-secure dict.
     if not hdr_access_key in keys:
+        logging.warning("ACCESS_KEY_NOT_FOUND")
         raise SignatureException(
             code_pb2.INVALID_ARGUMENT,
             type_enum().TYPE_INVALID_ACCESS_KEY_ID,
@@ -278,7 +280,7 @@ def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
         raise SignatureException(
             code_pb2.INVALID_ARGUMENT,
             type_enum().TYPE_SIGNATURE_DOES_NOT_MATCH,
-            401,
+            403,
             "SIGNATURE_NOT_VERIFIED",
         )
 
