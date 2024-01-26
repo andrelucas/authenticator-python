@@ -11,6 +11,7 @@ from google.rpc import status_pb2
 import grpc
 from grpc_status import rpc_status
 import logging
+import os
 import sys
 
 from authenticator.v1 import authenticator_pb2_grpc as auth_pb2_grpc
@@ -68,6 +69,26 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
         return False
 
 
+def issue(channel, args):
+    """
+    Issue the RPC. Factored out so we can use different types of channel.
+    """
+    stub = auth_pb2_grpc.AuthenticatorServiceStub(channel)
+
+    if args.command == "auth":
+        success = auth(stub, args)
+    else:
+        logging.error(f"Unknown command '{args.command}'")
+        sys.exit(2)
+
+
+def _load_credential_from_file(filepath):
+    """https://github.com/grpc/grpc/blob/master/examples/python/auth/_credentials.py"""
+    real_path = os.path.join(os.path.dirname(__file__), filepath)
+    with open(real_path, "rb") as f:
+        return f.read()
+
+
 def main(argv):
     p = argparse.ArgumentParser(description="AuthService client")
     p.add_argument("command", help="command to run", choices=["auth"])
@@ -75,10 +96,17 @@ def main(argv):
     p.add_argument("--authorization-header", help="Authorization: header contents")
     p.add_argument("--method", help="HTTP method", default="GET")
     p.add_argument("--string-to-sign-base64", help="stringToSign field")
+    p.add_argument(
+        "-t", "--tls", help="connect to the server using TLS", action="store_true"
+    )
     p.add_argument("--uri", help="server uri (will override address and port!)")
     p.add_argument("-a", "--address", help="server address", default="127.0.0.1")
     p.add_argument("-p", "--port", type=int, default=8002, help="server listen port")
     p.add_argument("-v", "--verbose", action="store_true")
+    ptls = p.add_argument_group("TLS arguments")
+    ptls.add_argument("--ca-cert", help="CA certificate file")
+    ptls.add_argument("--client-cert", help="client certificate file (NOT YET USED)")
+    ptls.add_argument("--client-key", help="client key file (NOT YET USED)")
 
     args = p.parse_args(argv)
     if not args.command:
@@ -90,21 +118,26 @@ def main(argv):
     else:
         logging.basicConfig(level=logging.INFO)
 
-    # Set up a channel first.
+    if args.tls:
+        if not args.ca_cert:
+            logging.error("TLS requires a CA certificate")
+            sys.exit(1)
+
+    # Set up a channel string first.
     server_address = f"dns:{args.address}:{args.port}"
     if args.uri:
         server_address = args.uri
     logging.debug(f"using server_address {server_address}")
     success = False
 
-    with grpc.insecure_channel(server_address) as channel:
-        stub = auth_pb2_grpc.AuthenticatorServiceStub(channel)
-
-        if args.command == "auth":
-            success = auth(stub, args)
-        else:
-            logging.error(f"Unknown command '{args.command}'")
-            sys.exit(2)
+    if args.tls:
+        root_crt = _load_credential_from_file(args.ca_cert)
+        channel_credential = grpc.ssl_channel_credentials(root_crt)
+        with grpc.secure_channel(server_address, channel_credential) as channel:
+            issue(channel, args)
+    else:
+        with grpc.insecure_channel(server_address) as channel:
+            issue(channel, args)
 
     if success:
         sys.exit(0)

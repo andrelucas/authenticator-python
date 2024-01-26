@@ -1,13 +1,37 @@
 # authenticator-python
 
+<!-- vscode-markdown-toc -->
+* [HTTP server](#HTTPserver)
+	* [Starting the server](#Startingtheserver)
+	* [Configure RGW](#ConfigureRGW)
+* [gRPC server](#gRPCserver)
+	* [Prereqs](#Prereqs)
+	* [Grab gRPC and protobuf generated code.](#GrabgRPCandprotobufgeneratedcode.)
+	* [Starting the server](#Startingtheserver-1)
+	* [Testing the gRPC server in standalone mode](#TestingthegRPCserverinstandalonemode)
+* [TLS mode](#TLSmode)
+* [General testing](#Generaltesting)
+	* [Configure RGW](#ConfigureRGW-1)
+* [Test](#Test)
+
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+
+
 Simple Python prototype of The Authenticator.
 
 This service comes in two flavours. The OG authenticator uses REST over HTTP,
 but the gRPC version is the version to use for real work.
 
-# HTTP server
 
-## Starting the server
+
+## <a name='HTTPserver'></a>HTTP server
+
+### <a name='Startingtheserver'></a>Starting the server
 
 ```sh
 # Start an authenticator server on port 8001.
@@ -19,7 +43,7 @@ but the gRPC version is the version to use for real work.
 
 The server can be stopped with CTRL-C.
 
-## Configure RGW
+### <a name='ConfigureRGW'></a>Configure RGW
 
 Obviously you'll need an RGW with the Handoff authenticator patched in and
 enabled. This configuration disables gRPC mode, which is required to test HTTP mode.
@@ -38,19 +62,19 @@ rgw_handoff_uri         = http://127.0.0.1:8001/
 ```
 
 
-# gRPC server
+## <a name='gRPCserver'></a>gRPC server
 
 The gRPC-based server is forked from the HTTP server as of 20231113. gRPC and
 HTTP are both being maintained in the short term, but HTTP will be deprecated
 in early 2024.
 
-## Prereqs
+### <a name='Prereqs'></a>Prereqs
 
 ```sh
 pip3 install grpcio grpcio-status grpcio-tools
 ```
 
-## Grab gRPC and protobuf generated code.
+### <a name='GrabgRPCandprotobufgeneratedcode.'></a>Grab gRPC and protobuf generated code.
 
 From a C++ build dir (not the source dir - these are generated files), grab
 `bufgen/authenticator/v1/*.py` and copy to `authenticator/v1/` in
@@ -63,7 +87,7 @@ cp MYBUILDDIR/bufgen/authenticator/v1/*.py authenticator/v1
 The path is so the Python code can be imported as a module, using the proper
 path. (It has to match the protobuf source's expected path.)
 
-## Starting the server
+### <a name='Startingtheserver-1'></a>Starting the server
 
 ```sh
 # Start an authenticator server on port 8001.
@@ -90,7 +114,7 @@ ImportError: cannot import name 'auth_pb2_grpc' from 'authenticator.v1' (unknown
 
 then you've not installed the gRPC generated source as directed above. Pay attention!
 
-## Testing the gRPC server in standalone mode
+### <a name='TestingthegRPCserverinstandalonemode'></a>Testing the gRPC server in standalone mode
 
 There's a standalone gRPC client that's useful for checking the server without
 too much machinery.
@@ -128,9 +152,37 @@ DEBUG:root:using server_address dns:127.0.0.1:8002
 INFO:root:server responses: uid='testid'
 ```
 
-# General testing
+## <a name='TLSmode'></a>TLS mode
 
-## Configure RGW
+The server and client can run with TLS enabled. For now, it's very simple TLS,
+wherein the server has a key and certificate which the client can verify when
+it has the CA certificate.
+
+If mTLS is deemed necessary, we should update accordingly.
+
+```sh
+# Set up credentials for TLS run.
+cd credentials # This directory.
+./create_ca.sh
+./create_cert.sh -a "subjectAltName = DNS:localhost,IP:127.0.0.1" localhost localhost
+
+# Go back to the parent directory and run the server with TLS enabled.
+./grpc_auth_server.py --verbose -t --server-cert=credentials/localhost.crt --server-key=credentials/localhost.key
+
+# ... in a separate terminal ...
+
+# Now the client examples will work if you give them the TLS root cert.
+./grpc_auth_client.py -v auth -t --ca-cert=credentials/root.crt \
+  --string-to-sign="QVdTNC1ITUFDLVNIQTI1NgoyMDIzMTExM1QxNTA4MzNaCjIwMjMxMTEzL3VzLWVhc3QtMS9zMy9hd3M0X3JlcXVlc3QKOTFmM2ZlYmQ1NjFhMTgyNDU1M2RmNTQxMzJiMDVhNGFjZDk2ZDRlOTI4OWE0M2EzMWM5YmY5NWM5M2Q3OTY5Ng==" \
+  --authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace"
+
+DEBUG:root:using server_address dns:127.0.0.1:8002
+INFO:root:server responses: uid='testid'
+```
+
+## <a name='Generaltesting'></a>General testing
+
+### <a name='ConfigureRGW-1'></a>Configure RGW
 
 You'll need an RGW with the Handoff authenticator patched in and
 enabled. This configuration applies to a regular cluster, but can be applied
@@ -159,7 +211,7 @@ env CEPH_PORT=40000 FS=0 RGW=1 MON=1 MDS=0 OSD=1 \
     -o "rgw_beast_enable_async = false" -o "rgw_dns_name = $(hostname -f)"
 ```
 
-# Test
+## <a name='Test'></a>Test
 
 I use the dbstore backend for Ceph, which automatically installs a user with a
 set keypair, mapping to uid 'testid'. I test with `s3cmd`.

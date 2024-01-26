@@ -19,6 +19,8 @@ from hashlib import sha256, sha1
 import hmac
 import logging
 import re
+import os
+import sys
 
 from authenticator.v1 import authenticator_pb2_grpc as auth_pb2_grpc
 from authenticator.v1 import authenticator_pb2 as auth_pb2
@@ -325,8 +327,15 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
             context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
 
 
-def run(port=8002):
-    server_address = f"127.0.0.1:{port}"
+def _load_credential_from_file(filepath):
+    """https://github.com/grpc/grpc/blob/master/examples/python/auth/_credentials.py"""
+    real_path = os.path.join(os.path.dirname(__file__), filepath)
+    with open(real_path, "rb") as f:
+        return f.read()
+
+
+def run(args):
+    server_address = f"127.0.0.1:{args.port}"
     logging.info("Starting gRPC service...\n")
     try:
         server = grpc.server(
@@ -336,7 +345,23 @@ def run(port=8002):
             ),  # This apparently helps detect port reuse - see https://github.com/grpc/grpc/issues/16920
         )
         auth_pb2_grpc.add_AuthenticatorServiceServicer_to_server(AuthServer(), server)
-        server.add_insecure_port(server_address)
+
+        if args.tls:
+            server_crt = _load_credential_from_file(args.server_cert)
+            server_key = _load_credential_from_file(args.server_key)
+            server_credentials = grpc.ssl_server_credentials(
+                (
+                    (
+                        server_key,
+                        server_crt,
+                    ),
+                )
+            )
+            server.add_secure_port(server_address, server_credentials)
+
+        else:
+            server.add_insecure_port(server_address)
+
         server.start()
         logging.info(f"Server started, listening on {server_address}")
         server.wait_for_termination()
@@ -350,7 +375,14 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(description="Auth gRPC server")
     p.add_argument("port", type=int, help="Listen port", nargs="?", default=8002)
+    p.add_argument(
+        "-t", "--tls", help="connect to the server using TLS", action="store_true"
+    )
     p.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
+    ptls = p.add_argument_group("TLS arguments")
+    ptls.add_argument("--ca-cert", help="CA certificate file (NOT YET USED)")
+    ptls.add_argument("--server-cert", help="client certificate file")
+    ptls.add_argument("--server-key", help="client key file")
 
     args = p.parse_args()
     if args.verbose:
@@ -358,4 +390,12 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    run(args.port)
+    if args.tls:
+        if not args.server_cert:
+            logging.error("TLS requires a server certificate")
+            sys.exit(1)
+        if not args.server_key:
+            logging.error("TLS requires a server key")
+            sys.exit(1)
+
+    run(args)
