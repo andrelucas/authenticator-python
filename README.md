@@ -74,18 +74,37 @@ in early 2024.
 pip3 install grpcio grpcio-status grpcio-tools
 ```
 
-### <a name='GrabgRPCandprotobufgeneratedcode.'></a>Grab gRPC and protobuf generated code.
+### <a name='GrabgRPCandprotobufgeneratedcode.'></a>gRPC and protobuf generated code.
 
-From a C++ build dir (not the source dir - these are generated files), grab
-`bufgen/authenticator/v1/*.py` and copy to `authenticator/v1/` in
-the authenticator-python source tree.
+To reduce friction I've added the gRPC generated code into this repository. If
+you need to regenerate it, you'll need the gRPC toolchain and the buf utility
+in your path.
+
+#### Copy `authenticator.proto` out of `obj-endpoint`
+
+The authoritative source of the gRPC and protobuf code is in the
+`obj-endpoint` git repository, under `protos/authenticator/v1`. Copy updated
+versions into this to `protos/authenticator/v1`` in this repository and
+commit.
+
+#### Run `buf` to generate the Python code
 
 ```sh
-cp MYBUILDDIR/bufgen/authenticator/v1/*.py authenticator/v1
+buf generate
 ```
 
-The path is so the Python code can be imported as a module, using the proper
-path. (It has to match the protobuf source's expected path.)
+If buf isn't installed, [install it](https://buf.build/docs/installation). The
+'Source' install option is pretty reliable, but you need Go installed. I'm not
+going to document how to install Go here.
+
+If `buf` complains about missing gRPC tools, you'll need to install those. I
+use `grpc_python_plugin` built from the gRPC source, because our Ceph builds
+gRPC from source. If you have a Ceph build setup you can build this yourself
+with `ninja grpc_python_plugin`. It goes into `BUILDDIR/bin`; add this to
+your PATH.
+
+`buf generate` will put its output in `authenticator/v1/`, which is set up to
+be a Python module that can be imported directly.
 
 ### <a name='Startingtheserver-1'></a>Starting the server
 
