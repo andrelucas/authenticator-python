@@ -6,7 +6,9 @@
 	* [Configure RGW](#ConfigureRGW)
 * [gRPC server](#gRPCserver)
 	* [Prereqs](#Prereqs)
-	* [Grab gRPC and protobuf generated code.](#GrabgRPCandprotobufgeneratedcode.)
+	* [gRPC and protobuf generated code.](#gRPCandprotobufgeneratedcode.)
+		* [Optional: Copy `authenticator.proto` out of `obj-endpoint`](#Optional:Copyauthenticator.protooutofobj-endpoint)
+		* [Optional: Run `buf` to generate the Python code](#Optional:RunbuftogeneratethePythoncode)
 	* [Starting the server](#Startingtheserver-1)
 	* [Testing the gRPC server in standalone mode](#TestingthegRPCserverinstandalonemode)
 * [TLS mode](#TLSmode)
@@ -74,20 +76,20 @@ in early 2024.
 pip3 install grpcio grpcio-status grpcio-tools
 ```
 
-### <a name='GrabgRPCandprotobufgeneratedcode.'></a>gRPC and protobuf generated code.
+### <a name='gRPCandprotobufgeneratedcode.'></a>gRPC and protobuf generated code.
 
 To reduce friction I've added the gRPC generated code into this repository. If
 you need to regenerate it, you'll need the gRPC toolchain and the buf utility
 in your path.
 
-#### Copy `authenticator.proto` out of `obj-endpoint`
+#### <a name='Optional:Copyauthenticator.protooutofobj-endpoint'></a>Optional: Copy `authenticator.proto` out of `obj-endpoint`
 
 The authoritative source of the gRPC and protobuf code is in the
 `obj-endpoint` git repository, under `protos/authenticator/v1`. Copy updated
 versions into this to `protos/authenticator/v1`` in this repository and
 commit.
 
-#### Run `buf` to generate the Python code
+#### <a name='Optional:RunbuftogeneratethePythoncode'></a>Optional: Run `buf` to generate the Python code
 
 ```sh
 buf generate
