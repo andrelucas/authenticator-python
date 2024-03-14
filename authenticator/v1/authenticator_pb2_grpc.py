@@ -25,6 +25,11 @@ class AuthenticatorServiceStub(object):
                 request_serializer=authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLRequest.SerializeToString,
                 response_deserializer=authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLResponse.FromString,
                 )
+        self.GetSigningKey = channel.unary_unary(
+                '/authenticator.v1.AuthenticatorService/GetSigningKey',
+                request_serializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.SerializeToString,
+                response_deserializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.FromString,
+                )
 
 
 class AuthenticatorServiceServicer(object):
@@ -45,6 +50,13 @@ class AuthenticatorServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetSigningKey(self, request, context):
+        """Request a signing key for the given request.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AuthenticatorServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -57,6 +69,11 @@ def add_AuthenticatorServiceServicer_to_server(servicer, server):
                     servicer.AuthenticatePresignedURL,
                     request_deserializer=authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLRequest.FromString,
                     response_serializer=authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLResponse.SerializeToString,
+            ),
+            'GetSigningKey': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSigningKey,
+                    request_deserializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.FromString,
+                    response_serializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -100,5 +117,22 @@ class AuthenticatorService(object):
         return grpc.experimental.unary_unary(request, target, '/authenticator.v1.AuthenticatorService/AuthenticatePresignedURL',
             authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLRequest.SerializeToString,
             authenticator_dot_v1_dot_authenticator__pb2.AuthenticatePresignedURLResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetSigningKey(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/authenticator.v1.AuthenticatorService/GetSigningKey',
+            authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.SerializeToString,
+            authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
