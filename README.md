@@ -173,6 +173,16 @@ DEBUG:root:using server_address dns:127.0.0.1:8002
 INFO:root:server responses: uid='testid'
 ```
 
+Finally here's a v4 signing key request:
+
+```sh
+./grpc_auth_client.py -v sign \
+  --authorization-header="AWS4-HMAC-SHA256 Credential=0555b35654ad1656d804/20231113/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;x-amz-content-sha256;x-amz-date, Signature=2d139a3564b7795d859f5ce788b0d7a0f0c9028c8519b381c9add9a72345aace"
+
+DEBUG:root:using server_address dns:127.0.0.1:8002
+INFO:root:server response: key='adc9095910047d23e416b24d4d1edf1bcd386fcc58d3307a159e8caf2bdb613e'
+```
+
 ## <a name='TLSmode'></a>TLS mode
 
 The server and client can run with TLS enabled. For now, it's very simple TLS,

@@ -288,6 +288,63 @@ def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
 
     return uid
 
+def v4_signing_key(req: auth_pb2.GetSigningKeyRequest):
+    """
+    Copy the signature generation from aws_sig_v4 and return the signature as
+    a byte array.
+
+    XXX should probably be refactored. Even if it's only a prototype.
+    """
+
+    # Everything gets encoded into byte arrays. This is a pain and looks ugly,
+    # but keeps Python happy.
+
+    # Split the Authorization header into useful chunks.
+    auth = req.authorization_header
+
+    m = re_sig_v4.search(auth)
+    if not m:
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_AUTHORIZATION_HEADER_MALFORMED,
+            400,
+            "V4_AUTHORIZATION_HEADER_MALFORMED",
+        )
+
+    # We'll use the access key to look up the secret.
+    hdr_access_key = m.group("accesskey")
+    logging.debug(f"hdr_access_key: {hdr_access_key}")
+
+    # These are used to generate the Signing Key.
+    hdr_shortdate = m.group("date").encode("UTF-8")
+    hdr_region = m.group("region").encode("UTF-8")
+    hdr_service = m.group("service").encode("UTF-8")
+    # This is used to check we agreee.
+    hdrsig = m.group("sig")
+
+    # Extract the secret key and userid from our super-secure dict.
+    if not hdr_access_key in keys:
+        logging.warning("ACCESS_KEY_NOT_FOUND")
+        raise SignatureException(
+            code_pb2.INVALID_ARGUMENT,
+            type_enum().TYPE_INVALID_ACCESS_KEY_ID,
+            401,
+            "ACCESS_KEY_NOT_FOUND",
+        )
+    lookup = keys[hdr_access_key]
+    secret_key = lookup["secret"].encode("UTF-8")
+    uid = lookup["uid"]
+    access_key = hdr_access_key.encode("UTF-8")
+
+    # This is the Signing Key in step 2. It needs the secret key and some
+    # components from the Authorization header.
+    datekey = hmac.new(b"AWS4" + secret_key, hdr_shortdate, sha256).digest()
+    dateregionkey = hmac.new(datekey, hdr_region, sha256).digest()
+    dateregionservicekey = hmac.new(dateregionkey, hdr_service, sha256).digest()
+    signing_key = hmac.new(dateregionservicekey, b"aws4_request", sha256).digest()
+
+    return signing_key
+
 
 def auth_error_status(e: SignatureException):
     """
@@ -326,6 +383,14 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
             logging.warning(f"Authentication failed: {e}")
             context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
 
+    def GetSigningKey(self, request, context):
+        try:
+            key = v4_signing_key(request)
+            return auth_pb2.GetSigningKeyResponse(signing_key=key)
+
+        except Exception as e:
+            logging.warning(f"Failed to get signature: {e}")
+            context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
 
 def _load_credential_from_file(filepath):
     """https://github.com/grpc/grpc/blob/master/examples/python/auth/_credentials.py"""

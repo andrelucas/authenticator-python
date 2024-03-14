@@ -52,7 +52,7 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
             logging.error(f"RPC failed: {e}")
         else:
             logging.error(
-                f"PC failed: error={e} code={status.code} message='{status.details}'"
+                f"RPC failed: error={e} code={status.code} message='{status.details}'"
             )
             for detail in status.details:
                 # Unpack the ANY if it's a specific type.
@@ -68,6 +68,33 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
 
         return False
 
+def sign(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
+    req = auth_pb2.GetSigningKeyRequest()
+    req.authorization_header = args.authorization_header
+    try:
+        response = stub.GetSigningKey(req)
+        key = response.signing_key
+        logging.info(f"server response: key='{key.hex()}'")
+
+    except grpc.RpcError as e:
+        status = rpc_status.from_call(e)
+        if status is None:
+            logging.error(f"RPC failed: {e}")
+        else:
+            logging.error(f"RPC failed: error={e} code={status.code} message='{status.details}'")
+            for detail in status.details:
+                # Unpack the ANY if it's a specific type.
+                if detail.Is(auth_pb2.S3ErrorDetails.DESCRIPTOR):
+                    s3_error = auth_pb2.S3ErrorDetails()
+                    detail.Unpack(s3_error)
+                    tstr = auth_pb2.S3ErrorDetails.Type.DESCRIPTOR.values_by_number[
+                        s3_error.type
+                    ].name  # String form of the S3 error type.
+                    logging.error(
+                        f"S3ErrorDetails: type={tstr} http_status_code={s3_error.http_status_code}"
+                    )
+
+        return False
 
 def issue(channel, args):
     """
@@ -77,6 +104,8 @@ def issue(channel, args):
 
     if args.command == "auth":
         success = auth(stub, args)
+    elif args.command == "sign":
+        success = sign(stub, args)
     else:
         logging.error(f"Unknown command '{args.command}'")
         sys.exit(2)
@@ -91,7 +120,7 @@ def _load_credential_from_file(filepath):
 
 def main(argv):
     p = argparse.ArgumentParser(description="AuthService client")
-    p.add_argument("command", help="command to run", choices=["auth"])
+    p.add_argument("command", help="command to run", choices=["auth", "sign"])
     p.add_argument("--access-key-id", help="AWS_ACCESS_KEY_ID value")
     p.add_argument("--authorization-header", help="Authorization: header contents")
     p.add_argument("--method", help="HTTP method", default="GET")
