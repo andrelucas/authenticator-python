@@ -113,7 +113,7 @@ def reqmethod_to_str(method: auth_pb2.AuthenticateRESTRequest.HTTPMethod):
 
 
 def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
-    logging.info("new request")
+    logging.info("new auth request")
     anonymous: bool = False
 
     logging.debug(f"authorization_header: {req.authorization_header}")
@@ -296,6 +296,8 @@ def v4_signing_key(req: auth_pb2.GetSigningKeyRequest):
     XXX should probably be refactored. Even if it's only a prototype.
     """
 
+    logging.info("new signing key request")
+
     # Everything gets encoded into byte arrays. This is a pain and looks ugly,
     # but keeps Python happy.
 
@@ -343,6 +345,7 @@ def v4_signing_key(req: auth_pb2.GetSigningKeyRequest):
     dateregionservicekey = hmac.new(dateregionkey, hdr_service, sha256).digest()
     signing_key = hmac.new(dateregionservicekey, b"aws4_request", sha256).digest()
 
+    logging.debug(f"signing key: {signing_key.hex()}")
     return signing_key
 
 
