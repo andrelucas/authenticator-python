@@ -96,6 +96,9 @@ message AuthenticateRESTRequest {
   map<string, string> query_parameters = 6;
   // A map of all relevant x-amz-* headers from the user's S3 REST request.
   map<string, string> x_amz_headers = 7;
+  // The internal rgw transaction ID, may be useful for log correlation and
+  // perhaps additional authentication.
+  optional string transaction_id = 8;
 }
 
 // Response message for REST authentications.
@@ -134,6 +137,9 @@ message AuthenticatePresignedURLResponse {
 
 message GetSigningKeyRequest {
   string authorization_header = 1;
+  // The internal rgw transaction ID, may be useful for log correlation and
+  // perhaps additional authentication.
+  optional string transaction_id = 2;
 }
 
 message GetSigningKeyResponse {
