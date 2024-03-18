@@ -124,6 +124,9 @@ message AuthenticatePresignedURLRequest {
   string url = 2;
   // The HTTP method from the user's presigned URL S3 request.
   HTTPMethod http_method = 3;
+  // The internal rgw transaction ID, may be useful for log correlation and
+  // perhaps additional authentication.
+  optional string transaction_id = 4;
 }
 
 // Response message for Presigned URL authentications.
