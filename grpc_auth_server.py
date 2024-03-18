@@ -371,7 +371,13 @@ def auth_error_status(e: SignatureException):
 
 
 class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
+
+    c_auth = 0
+    c_sign = 0
+
     def AuthenticateREST(self, request, context):
+        self.c_auth += 1
+        logging.info(f"AuthenticateREST count {self.c_auth}")
         try:
             # aws_sig will raise SignatureException on any error.
             uid = aws_sig(request)
@@ -384,6 +390,8 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
             context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
 
     def GetSigningKey(self, request, context):
+        self.c_sign += 1
+        logging.info(f"SetSigningKey count {self.c_auth}")
         try:
             key = v4_signing_key(request)
             return auth_pb2.GetSigningKeyResponse(signing_key=key)
