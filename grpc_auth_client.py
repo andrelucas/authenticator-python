@@ -42,7 +42,7 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
     req.http_method = method_string_to_enum(args.method)
     try:
         response = stub.AuthenticateREST(req)
-        logging.info(f"server responses: uid='{response.user_id}'")
+        logging.info(f"server responses: uid='{response.canonical_user_id}'")
         return True
 
     except grpc.RpcError as e:

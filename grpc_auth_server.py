@@ -385,7 +385,7 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
             # aws_sig will raise SignatureException on any error.
             uid = aws_sig(request)
             return auth_pb2.AuthenticateRESTResponse(
-                user_id=uid,
+                canonical_user_id=uid,
             )
 
         except SignatureException as e:
