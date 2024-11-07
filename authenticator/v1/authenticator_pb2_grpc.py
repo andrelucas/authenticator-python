@@ -30,6 +30,11 @@ class AuthenticatorServiceStub(object):
                 request_serializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.SerializeToString,
                 response_deserializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.FromString,
                 )
+        self.AssumeRole = channel.unary_unary(
+                '/authenticator.v1.AuthenticatorService/AssumeRole',
+                request_serializer=authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleRequest.SerializeToString,
+                response_deserializer=authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleResponse.FromString,
+                )
 
 
 class AuthenticatorServiceServicer(object):
@@ -57,6 +62,13 @@ class AuthenticatorServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AssumeRole(self, request, context):
+        """AssumeRole generates temp creds for trusted use.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AuthenticatorServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -74,6 +86,11 @@ def add_AuthenticatorServiceServicer_to_server(servicer, server):
                     servicer.GetSigningKey,
                     request_deserializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.FromString,
                     response_serializer=authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.SerializeToString,
+            ),
+            'AssumeRole': grpc.unary_unary_rpc_method_handler(
+                    servicer.AssumeRole,
+                    request_deserializer=authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleRequest.FromString,
+                    response_serializer=authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -134,5 +151,22 @@ class AuthenticatorService(object):
         return grpc.experimental.unary_unary(request, target, '/authenticator.v1.AuthenticatorService/GetSigningKey',
             authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyRequest.SerializeToString,
             authenticator_dot_v1_dot_authenticator__pb2.GetSigningKeyResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def AssumeRole(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/authenticator.v1.AuthenticatorService/AssumeRole',
+            authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleRequest.SerializeToString,
+            authenticator_dot_v1_dot_authenticator__pb2.AssumeRoleResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
