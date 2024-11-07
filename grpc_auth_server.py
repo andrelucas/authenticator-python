@@ -42,6 +42,10 @@ keys = {
     },
 }
 
+# A list of bucket names that are considered public, i.e. can be accessed
+# anonymously.
+public_buckets = ["bucket", "test", "testnv"]
+
 
 # Regex to match fields out of the v2 Authorize header.
 re_sig_v2 = re.compile(
@@ -115,9 +119,12 @@ def reqmethod_to_str(method: auth_pb2.AuthenticateRESTRequest.HTTPMethod):
 def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
     logging.info("new auth request")
     anonymous: bool = False
-
-    logging.debug(f"authorization_header: {req.authorization_header}")
-    logging.debug(f"string_to_sign: {req.string_to_sign}")
+    if req.authorization_header == "":
+        logging.info("Authorization: header is empty, assuming anonymous access attempt")
+        anonymous = True
+    else:
+        logging.debug(f"authorization_header: {req.authorization_header}")
+        logging.debug(f"string_to_sign: {req.string_to_sign}")
 
     for k, v in req.x_amz_headers.items():
         logging.debug(f"x_amz_headers: {k}={v}")
@@ -131,11 +138,23 @@ def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
     if req.HasField("object_key"):
         logging.debug(f"object_key: {req.object_key}")
 
-    auth = req.authorization_header
-    if auth.startswith("AWS "):
-        return aws_sig_v2(req)
+    if anonymous:
+        if req.HasField("bucket_name"):
+            if req.bucket_name in public_buckets:
+                logging.info(f"Bucket {req.bucket_name} is public, allowing anonymous access")
+                return "anonymous"
+            else:
+                logging.error(f"Bucket {req.bucket_name} is not public")
+                raise SignatureException(code_pb2.INVALID_ARGUMENT, type_enum().TYPE_ACCESS_DENIED, 403, "ACCESS_DENIED")
+        else:
+            raise SignatureException(code_pb2.INVALID_ARGUMENT, type_enum().TYPE_ACCESS_DENIED, 403, "ACCESS_DENIED")
+            
     else:
-        return aws_sig_v4(req)
+        auth = req.authorization_header
+        if auth.startswith("AWS "):
+            return aws_sig_v2(req)
+        else:
+            return aws_sig_v4(req)
 
 
 def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
