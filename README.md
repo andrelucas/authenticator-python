@@ -26,54 +26,16 @@
 
 Simple Python prototype of The Authenticator.
 
-This service comes in two flavours. The OG authenticator uses REST over HTTP,
-but the gRPC version is the version to use for real work.
-
-
-
-## <a name='HTTPserver'></a>HTTP server
-
-### <a name='Startingtheserver'></a>Starting the server
-
-```sh
-# Start an authenticator server on port 8001.
-./authenticator.py
-
-# Start on a different port.
-./authenticator.py 8002
-```
-
-The server can be stopped with CTRL-C.
-
-### <a name='ConfigureRGW'></a>Configure RGW
-
-Obviously you'll need an RGW with the Handoff authenticator patched in and
-enabled. This configuration disables gRPC mode, which is required to test HTTP mode.
-
-```ini
-...
-# Enable the Handoff engine.
-rgw_s3_auth_use_handoff = true
-# Disable gRPC mode.
-rgw_handoff_enable_grpc = false
-# Not an https endpoint, so it doesn't matter.
-rgw_handoff_verify_ssl  = true
-# This is actually the default.
-rgw_handoff_uri         = http://127.0.0.1:8001/
-...
-```
-
-
 ## <a name='gRPCserver'></a>gRPC server
 
-The gRPC-based server is forked from the HTTP server as of 20231113. gRPC and
-HTTP are both being maintained in the short term, but HTTP will be deprecated
-in early 2024.
+As soon as gRPC was integrated into Akamai RGW, we moved from HTTP to gRPC and
+haven't looked back.
 
 ### <a name='Prereqs'></a>Prereqs
 
 ```sh
-pip3 install grpcio grpcio-status grpcio-tools
+pip3 install grpcio grpcio-status grpcio-tools \
+  opentelemetry-sdk opentelemetry-api
 ```
 
 ### <a name='gRPCandprotobufgeneratedcode.'></a>gRPC and protobuf generated code.
