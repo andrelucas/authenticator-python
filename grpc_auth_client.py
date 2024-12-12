@@ -17,6 +17,38 @@ import sys
 from authenticator.v1 import authenticator_pb2_grpc as auth_pb2_grpc
 from authenticator.v1 import authenticator_pb2 as auth_pb2
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    ConsoleSpanExporter,
+)
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
+
+resource = Resource(
+    attributes={
+        SERVICE_NAME: "grpc_auth_client",
+    }
+)
+
+provider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(
+    OTLPSpanExporter(endpoint="localhost:4317", insecure=True)
+)
+# processor = BatchSpanProcessor(ConsoleSpanExporter())
+provider.add_span_processor(processor)
+
+# Sets the global default tracer provider
+trace.set_tracer_provider(provider)
+
+# Creates a tracer from the global tracer provider
+tracer = trace.get_tracer(__name__)
+
+grpc_client_instrumentor = GrpcInstrumentorClient()
+grpc_client_instrumentor.instrument()
+
 
 def method_string_to_enum(method: str):
     m = auth_pb2.AuthenticateRESTRequest.HTTPMethod
@@ -35,6 +67,7 @@ def method_string_to_enum(method: str):
         return auth_pb2.HTTP_METHOD_UNSPECIFIED
 
 
+@tracer.start_as_current_span(name="auth")
 def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
     req = auth_pb2.AuthenticateRESTRequest()
     req.string_to_sign = base64.b64decode(args.string_to_sign_base64).decode()
@@ -68,6 +101,8 @@ def auth(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
 
         return False
 
+
+@tracer.start_as_current_span(name="sign")
 def sign(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
     req = auth_pb2.GetSigningKeyRequest()
     req.authorization_header = args.authorization_header
@@ -81,7 +116,9 @@ def sign(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
         if status is None:
             logging.error(f"RPC failed: {e}")
         else:
-            logging.error(f"RPC failed: error={e} code={status.code} message='{status.details}'")
+            logging.error(
+                f"RPC failed: error={e} code={status.code} message='{status.details}'"
+            )
             for detail in status.details:
                 # Unpack the ANY if it's a specific type.
                 if detail.Is(auth_pb2.S3ErrorDetails.DESCRIPTOR):
@@ -95,6 +132,7 @@ def sign(stub: auth_pb2_grpc.AuthenticatorServiceStub, args):
                     )
 
         return False
+
 
 def issue(channel, args):
     """
@@ -118,6 +156,7 @@ def _load_credential_from_file(filepath):
         return f.read()
 
 
+@tracer.start_as_current_span(name="main")
 def main(argv):
     p = argparse.ArgumentParser(description="AuthService client")
     p.add_argument("command", help="command to run", choices=["auth", "sign"])

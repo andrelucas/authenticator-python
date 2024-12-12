@@ -25,6 +25,38 @@ import sys
 from authenticator.v1 import authenticator_pb2_grpc as auth_pb2_grpc
 from authenticator.v1 import authenticator_pb2 as auth_pb2
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    # ConsoleSpanExporter,
+)
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
+
+resource = Resource(
+    attributes={
+        SERVICE_NAME: "grpc_auth_server",
+    }
+)
+
+provider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(
+    OTLPSpanExporter(endpoint="localhost:4317", insecure=True)
+)
+# processor = BatchSpanProcessor(ConsoleSpanExporter())
+provider.add_span_processor(processor)
+
+# Sets the global default tracer provider
+trace.set_tracer_provider(provider)
+
+# Creates a tracer from the global tracer provider
+tracer = trace.get_tracer(__name__)
+
+grpc_server_instrumentor = GrpcInstrumentorServer()
+grpc_server_instrumentor.instrument()
+
 # A fixed set of recognised keys, secrets and uids.
 # Feel the security.
 keys = {
@@ -116,11 +148,14 @@ def reqmethod_to_str(method: auth_pb2.AuthenticateRESTRequest.HTTPMethod):
         return "UNKNOWN"
 
 
+@tracer.start_as_current_span("aws_sig")
 def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
     logging.info("new auth request")
     anonymous: bool = False
     if req.authorization_header == "":
-        logging.info("Authorization: header is empty, assuming anonymous access attempt")
+        logging.info(
+            "Authorization: header is empty, assuming anonymous access attempt"
+        )
         anonymous = True
     else:
         logging.debug(f"authorization_header: {req.authorization_header}")
@@ -141,14 +176,26 @@ def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
     if anonymous:
         if req.HasField("bucket_name"):
             if req.bucket_name in public_buckets:
-                logging.info(f"Bucket {req.bucket_name} is public, allowing anonymous access")
+                logging.info(
+                    f"Bucket {req.bucket_name} is public, allowing anonymous access"
+                )
                 return "anonymous"
             else:
                 logging.error(f"Bucket {req.bucket_name} is not public")
-                raise SignatureException(code_pb2.INVALID_ARGUMENT, type_enum().TYPE_ACCESS_DENIED, 403, "ACCESS_DENIED")
+                raise SignatureException(
+                    code_pb2.INVALID_ARGUMENT,
+                    type_enum().TYPE_ACCESS_DENIED,
+                    403,
+                    "ACCESS_DENIED",
+                )
         else:
-            raise SignatureException(code_pb2.INVALID_ARGUMENT, type_enum().TYPE_ACCESS_DENIED, 403, "ACCESS_DENIED")
-            
+            raise SignatureException(
+                code_pb2.INVALID_ARGUMENT,
+                type_enum().TYPE_ACCESS_DENIED,
+                403,
+                "ACCESS_DENIED",
+            )
+
     else:
         auth = req.authorization_header
         if auth.startswith("AWS "):
@@ -157,6 +204,7 @@ def aws_sig(req: auth_pb2.AuthenticateRESTRequest):
             return aws_sig_v4(req)
 
 
+@tracer.start_as_current_span("aws_sig_v2")
 def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
     """
     Calculate an AWS S3 v2 signature, given the POST object sent by the
@@ -218,6 +266,7 @@ def aws_sig_v2(req: auth_pb2.AuthenticateRESTRequest):
     return uid
 
 
+@tracer.start_as_current_span("aws_sig_v2")
 def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
     """
     Calculate an AWS S3 v4 signature, given the POST object send by the
@@ -306,6 +355,7 @@ def aws_sig_v4(req: auth_pb2.AuthenticateRESTRequest):
         )
 
     return uid
+
 
 def v4_signing_key(req: auth_pb2.GetSigningKeyRequest):
     """
@@ -397,6 +447,7 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
     c_auth = 0
     c_sign = 0
 
+    @tracer.start_as_current_span("AuthenticateREST")
     def AuthenticateREST(self, request, context):
         self.c_auth += 1
         logging.info(f"AuthenticateREST count {self.c_auth}")
@@ -421,6 +472,7 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
         except Exception as e:
             logging.warning(f"Failed to get signature: {e}")
             context.abort_with_status(rpc_status.to_status(auth_error_status(e)))
+
 
 def _load_credential_from_file(filepath):
     """https://github.com/grpc/grpc/blob/master/examples/python/auth/_credentials.py"""

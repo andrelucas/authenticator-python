@@ -35,7 +35,10 @@ haven't looked back.
 
 ```sh
 pip3 install grpcio grpcio-status grpcio-tools \
-  opentelemetry-sdk opentelemetry-api
+  opentelemetry-sdk opentelemetry-api \
+  opentelemetry-exporter-otlp-proto-grpc \
+  opentelemetry-instrumentation-grpc
+
 ```
 
 ### <a name='gRPCandprotobufgeneratedcode.'></a>gRPC and protobuf generated code.
