@@ -1,19 +1,16 @@
 # authenticator-python
 
 <!-- vscode-markdown-toc -->
-* [HTTP server](#HTTPserver)
-	* [Starting the server](#Startingtheserver)
-	* [Configure RGW](#ConfigureRGW)
 * [gRPC server](#gRPCserver)
 	* [Prereqs](#Prereqs)
 	* [gRPC and protobuf generated code.](#gRPCandprotobufgeneratedcode.)
 		* [Optional: Copy `authenticator.proto` out of `obj-endpoint`](#Optional:Copyauthenticator.protooutofobj-endpoint)
 		* [Optional: Run `buf` to generate the Python code](#Optional:RunbuftogeneratethePythoncode)
-	* [Starting the server](#Startingtheserver-1)
+	* [Starting the server](#Startingtheserver)
 	* [Testing the gRPC server in standalone mode](#TestingthegRPCserverinstandalonemode)
 * [TLS mode](#TLSmode)
 * [General testing](#Generaltesting)
-	* [Configure RGW](#ConfigureRGW-1)
+	* [Configure RGW](#ConfigureRGW)
 * [Test](#Test)
 
 <!-- vscode-markdown-toc-config
@@ -70,7 +67,7 @@ your PATH.
 `buf generate` will put its output in `authenticator/v1/`, which is set up to
 be a Python module that can be imported directly.
 
-### <a name='Startingtheserver-1'></a>Starting the server
+### <a name='Startingtheserver'></a>Starting the server
 
 ```sh
 # Start an authenticator server on port 8001.
@@ -175,7 +172,7 @@ INFO:root:server responses: uid='testid'
 
 ## <a name='Generaltesting'></a>General testing
 
-### <a name='ConfigureRGW-1'></a>Configure RGW
+### <a name='ConfigureRGW'></a>Configure RGW
 
 You'll need an RGW with the Handoff authenticator patched in and
 enabled. This configuration applies to a regular cluster, but can be applied
