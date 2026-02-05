@@ -1,0 +1,5 @@
+grpcio
+grpcio-status
+grpcio-tools
+opentelemetry-sdk
+opentelemetry-api
