@@ -413,7 +413,7 @@ class AuthServer(auth_pb2_grpc.AuthenticatorServiceServicer):
 
     def GetSigningKey(self, request, context):
         self.c_sign += 1
-        logging.info(f"SetSigningKey count {self.c_auth}")
+        logging.info(f"GetSigningKey count {self.c_auth}")
         try:
             key = v4_signing_key(request)
             return auth_pb2.GetSigningKeyResponse(signing_key=key)
