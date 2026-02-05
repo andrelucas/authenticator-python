@@ -30,6 +30,26 @@ haven't looked back.
 
 ### <a name='Prereqs'></a>Prereqs
 
+It's generally safer to use a virtualenv. For the uninitiated, this is a
+local environment in which you can safely add whatever modules and
+versions of things you like, without affecting the external system at
+all. Note you have to do this whenever you have a new shell. It doesn't
+automatically persist without extra work.
+
+```sh
+# Create a virtualenv in .venv .
+python3 -m venv .venv
+
+# Activate it.
+source .venv/bin/activate
+
+# Install requirements into local env.
+venv> pip install -r requirements.txt
+...
+```
+
+You can, however, do things the hard way if you insist.
+
 ```sh
 pip3 install grpcio grpcio-status grpcio-tools \
   opentelemetry-sdk opentelemetry-api
